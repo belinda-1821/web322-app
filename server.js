@@ -9,7 +9,7 @@ var views = path.join(__dirname, 'views');
 
 
 blog.initialize().then(function () {
-    app.listen(process.env.APP_PORT || 8080, () => {
+    app.listen(process.env.PORT || 8080, () => {
         console.log("Server Started at port 8080");
     })
 }).catch(function (err) {
