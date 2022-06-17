@@ -83,6 +83,10 @@ app.get('/posts', (req, res) => {
     }
 })
 
+app.get('/posts/add', (req, res) => {
+    res.sendFile(path.join(views, 'addPost.html'));
+});
+
 app.get('/posts/:id', (req, res)=>{
     blog.getPostsById(req.params.id).then((data) => {
         res.json(data)
@@ -94,9 +98,7 @@ app.get('/posts/:id', (req, res)=>{
     })
 })
 
-app.get('/posts/add', (req, res) => {
-    res.sendFile(path.join(views, 'addPost.html'));
-});
+
 
 app.post('/posts/add', upload.single("featureImage"), (req, res) => {
     if (req.file) {
