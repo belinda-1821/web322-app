@@ -41,7 +41,6 @@ module.exports.getAllPosts = function () {
 
 module.exports.getPublishedPosts = function () {
     return new Promise(function (resolve, reject) {
-
         var publishedPosts = [];
 
         for (let i = 0; i < posts.length; i++) {
@@ -80,6 +79,25 @@ module.exports.getPostsByCategory = function (category) {
     });
 }
 
+module.exports.getPublishedPostsByCategory = function (category) {
+    return new Promise(function (resolve, reject) {
+        var publishedPostsByCategory = [];
+        for (let i = 0; i < posts.length; i++) {
+
+            if (posts[i].published == true && posts[i].category == category) {
+                publishedPostsByCategory.push(posts[i]);
+            }
+        }
+
+        if (publishedPostsByCategory.length == 0) {
+            reject("query returned 0 results");
+            return;
+        }
+        resolve(publishedPostsByCategory);
+    });
+}
+
+
 module.exports.getPostsByMinDate = function (minDateStr) {
     return new Promise(function (resolve, reject) {
         var postsByMinDate = [];
@@ -97,13 +115,13 @@ module.exports.getPostsByMinDate = function (minDateStr) {
 
         resolve(postsByMinDate);
     });
-    
+
 }
 
-module.exports.getPostsById = function (id) {
+module.exports.getPostById = function (id) {
     return new Promise(function (resolve, reject) {
         var postById = [];
-        
+
         for (let i = 0; i < posts.length; i++) {
             if (posts[i].id == id) {
                 postById.push(posts[i]);
@@ -114,7 +132,6 @@ module.exports.getPostsById = function (id) {
             reject("query returned 0 results");
             return;
         }
-
         resolve(postById);
     });
 }
@@ -134,6 +151,18 @@ module.exports.addPost = function (postData) {
 
         postData.published = (postData.published) ? true : false;
         postData.id = posts.length + 1;
+
+        let currentDate = new Date(),
+            month = '' + (currentDate.getMonth() + 1),
+            day = '' + currentDate.getDate(),
+            year = currentDate.getFullYear();
+
+        if (month.length < 2)
+            month = '0' + month;
+        if (day.length < 2)
+            day = '0' + day;
+
+        postData.postDate = year + '-' + month + '-' + day;
         posts.push(postData);
 
         resolve();
