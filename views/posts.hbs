@@ -3,7 +3,7 @@
         {{#unless posts}}
         <strong>{{message}}</strong>
         {{/unless}}
-        <h2>Posts</h2>
+        <h2>Posts<a href="/posts/add" class="btn btn-success pull-right">Add Post</a></h2>
         <hr />
         <div class="table-responsive">
             <table class="table">
@@ -14,6 +14,7 @@
                         <th>Post Date</th>
                         <th>Category</th>
                         <th>Published</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -24,6 +25,7 @@
                         <td>{{this.postDate}}</td>
                         <td><a href="/posts?category={{this.category}}">{{this.category}}</a></td>
                         <td>{{this.published}}</td>
+                        <td><a href="/post/delete/{{this.id}}" class="btn btn-danger">Remove</a></td>
                     </tr>
                     {{/each}}
                 </tbody>

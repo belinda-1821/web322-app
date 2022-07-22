@@ -1,12 +1,12 @@
 /*********************************************************************************
-* WEB322 – Assignment 04
+* WEB322 – Assignment 05
 * I declare that this assignment is my own work in accordance with Seneca Academic Policy. No part
 * of this assignment has been copied manually or electronically from any other source
 * (including 3rd party web sites) or distributed to other students.
 *
-* Name: ___Belinda Jean Preeth Jerien____ Student ID: ___122442212__ Date: __July 07, 2022__
+* Name: ___Belinda Jean Preeth Jerien____ Student ID: ___122442212__ Date: __July 22, 2022__
 *
-* Heroku App URL: https://belinda-web322-assignment4.herokuapp.com/
+* Heroku App URL: https://belinda-web322-assignment5.herokuapp.com/
 *
 * GitHub Repository URL: https://github.com/belinda-1821/web322-app
 
@@ -17,14 +17,18 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const exphbs = require('express-handlebars');
+const bodyParser = require('body-parser');
 const stripJs = require('strip-js');
 
 const blog = require('./blog-service');
 const app = express();
 
+app.use(bodyParser.urlencoded({
+    extended: true
+}));
+app.use(bodyParser.json());
 
-
-
+// Handlebar setup and custom helpers
 app.engine('.hbs', exphbs.engine({
     extname: '.hbs',
     helpers: {
@@ -43,13 +47,19 @@ app.engine('.hbs', exphbs.engine({
             }
         },
         safeHTML: function (context) {
-            return stripJs(context);
+            return stripJs(context); 
+        },
+        formatDate: function (dateObj) {
+            let year = dateObj.getFullYear();
+            let month = (dateObj.getMonth() + 1).toString();
+            let day = dateObj.getDate().toString();
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         }
     }
 }));
 app.set('view engine', '.hbs');
 
-
+// Cloudinary for image upload
 cloudinary.config({
     cloud_name: 'bjpjerien',
     api_key: '999693617868597',
@@ -59,12 +69,11 @@ cloudinary.config({
 
 const upload = multer();
 
-
+// View Path settings
 var path = require('path');
-const { log } = require('console');
 var views = path.join(__dirname, 'views');
 
-
+// Starting Server
 blog.initialize().then(function () {
     app.listen(process.env.PORT || 8080, () => {
         console.log("Server Started at port 8080");
@@ -76,6 +85,7 @@ blog.initialize().then(function () {
 
 app.use(express.static('public'));
 
+// Set Active Route Style
 app.use(function (req, res, next) {
     let route = req.path.substring(1);
     app.locals.activeRoute = (route == "/") ? "/" : "/" + route.replace(/\/(.*)/, "");
@@ -83,6 +93,7 @@ app.use(function (req, res, next) {
     next();
 });
 
+// Routes
 app.get('/', (req, res) => {
     res.redirect('/blog');
 });
@@ -91,32 +102,53 @@ app.get('/about', (req, res) => {
     res.render('about')
 });
 
+// Post Routes
 app.get('/posts/add', (req, res) => {
-    res.render('addPost');
+    blog.getCategories().then((data) => {
+        res.render('addPost', {
+            categories: data
+        });
+    }).catch((err) => {
+        res.render('addPost', {
+            categories: []
+        });
+    })
 });
 
 app.get('/posts', (req, res) => {
     if (req.query.category) {
         blog.getPostsByCategory(req.query.category).then((data) => {
-            res.render('posts', {
-                posts: data
-            })
+            if (data.length > 0) {
+                res.render('posts', {
+                    posts: data
+                })
+            } else {
+                res.render('posts', { message: "No Results" });
+            }
         }).catch((err) => {
             res.render("posts", { message: "No results" });
         })
     } else if (req.query.minDate) {
         blog.getPostsByMinDate(req.query.minDate).then((data) => {
-            res.render('posts', {
-                posts: data
-            })
+            if (data.length > 0) {
+                res.render('posts', {
+                    posts: data
+                })
+            } else {
+                res.render('posts', { message: "No Results" });
+            }
         }).catch((err) => {
             res.render("posts", { message: "No results" });
         })
     } else {
         blog.getAllPosts().then((data) => {
-            res.render('posts', {
-                posts: data
-            })
+            if (data.length > 0) {
+                res.render('posts', {
+                    posts: data
+                })
+            } else {
+                res.render('posts', { message: "No Results" });
+            }
         })
             .catch((err) => {
                 res.render("posts", { message: "No results" });
@@ -171,6 +203,16 @@ app.post('/posts/add', upload.single("featureImage"), (req, res) => {
         })
     }
 })
+
+app.get('/post/delete/:id', (req, res) => {
+    blog.deletePostById(req.params.id).then(() => {
+        res.redirect('/posts');
+    }).catch((err) => {
+        res.status(500).render('posts', { message: "Unable to delete Post/ Post not Found" });
+    })
+});
+
+// Blog Routes
 
 app.get('/blog/:id', async (req, res) => {
 
@@ -273,13 +315,18 @@ app.get('/blog', async (req, res) => {
 
 });
 
-
+// Category Routes
 
 app.get('/categories', (req, res) => {
     blog.getCategories().then((data) => {
-        res.render('categories', {
-            categories: data
-        })
+        if (data.length > 0) {
+            res.render('categories', {
+                categories: data
+            })
+        } else {
+            res.render('categories', { message: "No results" });
+        }
+
     })
         .catch((err) => {
             res.render('categories', {
@@ -287,6 +334,29 @@ app.get('/categories', (req, res) => {
             });
         })
 })
+
+app.get('/categories/add', (req, res) => {
+    res.render('addCategory');
+});
+
+app.post('/categories/add', (req, res) => {
+    console.log(req);
+    blog.addCategory(req.body).then(() => {
+        res.redirect('/categories');
+    }).catch((err) => {
+        res.render('categories', { message: 'Unable to add Category' });
+    })
+});
+
+app.get('/categories/delete/:id', (req, res) => {
+    blog.deleteCategoryById(req.params.id).then(() => {
+        res.redirect('/categories');
+    }).catch((err) => {
+        res.render('categories', { message: "Unable to delete Category" });
+    })
+});
+
+// 404 page
 app.use((req, res) => {
     res.status(404).render('404')
 });
