@@ -4,9 +4,9 @@
 * of this assignment has been copied manually or electronically from any other source
 * (including 3rd party web sites) or distributed to other students.
 *
-* Name: ___Belinda Jean Preeth Jerien____ Student ID: ___122442212__ Date: __July 22, 2022__
+* Name: ___Belinda Jean Preeth Jerien____ Student ID: ___122442212__ Date: __Aug 04, 2022__
 *
-* Heroku App URL: https://belinda-web322-assignment5.herokuapp.com/
+* Heroku App URL: https://belinda-web322-assignment6.herokuapp.com/
 *
 * GitHub Repository URL: https://github.com/belinda-1821/web322-app
 
@@ -21,12 +21,35 @@ const bodyParser = require('body-parser');
 const stripJs = require('strip-js');
 
 const blog = require('./blog-service');
+const authData = require('./auth-service');
+const clientSessions = require('client-sessions');
 const app = express();
 
 app.use(bodyParser.urlencoded({
     extended: true
 }));
 app.use(bodyParser.json());
+
+app.use(clientSessions({
+    cookieName: "session",
+    secret: "secret",
+    duration: 2 * 60 * 1000,
+    activeDuration: 1000 * 60
+}));
+
+app.use(function (req, res, next) {
+    res.locals.session = req.session;
+    next();
+});
+
+function ensureLogin(req, res, next) {
+    if (!req.session.user) {
+        res.redirect("/login");
+    }
+    else {
+        next();
+    }
+}
 
 // Handlebar setup and custom helpers
 app.engine('.hbs', exphbs.engine({
@@ -47,7 +70,7 @@ app.engine('.hbs', exphbs.engine({
             }
         },
         safeHTML: function (context) {
-            return stripJs(context); 
+            return stripJs(context);
         },
         formatDate: function (dateObj) {
             let year = dateObj.getFullYear();
@@ -74,13 +97,15 @@ var path = require('path');
 var views = path.join(__dirname, 'views');
 
 // Starting Server
-blog.initialize().then(function () {
-    app.listen(process.env.PORT || 8080, () => {
-        console.log("Server Started at port 8080");
-    })
-}).catch(function (err) {
-    console.log("unable to start server: " + err);
-});
+blog.initialize()
+    .then(authData.initialize)
+    .then(function () {
+        app.listen(process.env.PORT || 8080, () => {
+            console.log("Server Started at port 8080");
+        })
+    }).catch(function (err) {
+        console.log("unable to start server: " + err);
+    });
 
 
 app.use(express.static('public'));
@@ -103,7 +128,7 @@ app.get('/about', (req, res) => {
 });
 
 // Post Routes
-app.get('/posts/add', (req, res) => {
+app.get('/posts/add', ensureLogin, (req, res) => {
     blog.getCategories().then((data) => {
         res.render('addPost', {
             categories: data
@@ -115,7 +140,7 @@ app.get('/posts/add', (req, res) => {
     })
 });
 
-app.get('/posts', (req, res) => {
+app.get('/posts', ensureLogin, (req, res) => {
     if (req.query.category) {
         blog.getPostsByCategory(req.query.category).then((data) => {
             if (data.length > 0) {
@@ -156,7 +181,7 @@ app.get('/posts', (req, res) => {
     }
 })
 
-app.get('/posts/:id', (req, res) => {
+app.get('/posts/:id', ensureLogin, (req, res) => {
     blog.getPostsById(req.params.id).then((data) => {
         res.json(data)
     })
@@ -168,7 +193,7 @@ app.get('/posts/:id', (req, res) => {
 })
 
 
-app.post('/posts/add', upload.single("featureImage"), (req, res) => {
+app.post('/posts/add', ensureLogin, upload.single("featureImage"), (req, res) => {
     if (req.file) {
         let streamUpload = (req) => {
             return new Promise((resolve, reject) => {
@@ -204,7 +229,7 @@ app.post('/posts/add', upload.single("featureImage"), (req, res) => {
     }
 })
 
-app.get('/post/delete/:id', (req, res) => {
+app.get('/post/delete/:id', ensureLogin, (req, res) => {
     blog.deletePostById(req.params.id).then(() => {
         res.redirect('/posts');
     }).catch((err) => {
@@ -317,7 +342,7 @@ app.get('/blog', async (req, res) => {
 
 // Category Routes
 
-app.get('/categories', (req, res) => {
+app.get('/categories', ensureLogin, (req, res) => {
     blog.getCategories().then((data) => {
         if (data.length > 0) {
             res.render('categories', {
@@ -335,11 +360,11 @@ app.get('/categories', (req, res) => {
         })
 })
 
-app.get('/categories/add', (req, res) => {
+app.get('/categories/add', ensureLogin, (req, res) => {
     res.render('addCategory');
 });
 
-app.post('/categories/add', (req, res) => {
+app.post('/categories/add', ensureLogin, (req, res) => {
     console.log(req);
     blog.addCategory(req.body).then(() => {
         res.redirect('/categories');
@@ -348,7 +373,7 @@ app.post('/categories/add', (req, res) => {
     })
 });
 
-app.get('/categories/delete/:id', (req, res) => {
+app.get('/categories/delete/:id', ensureLogin, (req, res) => {
     blog.deleteCategoryById(req.params.id).then(() => {
         res.redirect('/categories');
     }).catch((err) => {
@@ -356,6 +381,57 @@ app.get('/categories/delete/:id', (req, res) => {
     })
 });
 
+
+// Login Route
+
+app.get("/login", (req, res) => {
+    res.render('login');
+});
+
+app.get("/register", (req, res) => {
+    res.render('register');
+});
+
+app.post("/register", (req, res) => {
+    authData.registerUser(req.body)
+        .then(() => {
+            res.render('register', { successMessage: "User Created" });
+        })
+        .catch((err) => {
+            res.render('register', {
+                errorMessage: err,
+                userName: req.body.userName
+            });
+        })
+});
+
+app.post("/login", (req, res) => {
+    req.body.userAgent = req.get('User-Agent');
+
+    authData.checkUser(req.body).then((user) => {
+        req.session.user = {
+            "userName": user.userName,
+            "email": user.email,
+            "loginHistory": user.loginHistory
+        }
+        res.redirect('/posts');
+    })
+        .catch((err) => {
+            res.render('login', {
+                errorMessage: err,
+                userName: req.body.userName
+            });
+        })
+});
+
+app.get('/logout', (req, res) => {
+    req.session.reset();
+    res.redirect('/login');
+});
+
+app.get('/userHistory', (req, res) => {
+    res.render('userHistory');
+})
 // 404 page
 app.use((req, res) => {
     res.status(404).render('404')
